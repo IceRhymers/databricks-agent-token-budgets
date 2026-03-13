@@ -1,0 +1,26 @@
+resources:
+  pipelines:
+    claude_usage_pipeline:
+      name: "claude-usage-analytics"
+      description: >
+        DLT pipeline that ingests AI Gateway inference table data and produces
+        per-user per-day Claude usage analytics with AI-generated interaction summaries.
+      development: true
+      serverless: true
+      channel: "PREVIEW"
+
+      configuration:
+        spark.claude_analytics.inference_table: ${var.inference_table}
+
+      libraries:
+        - notebook:
+            path: ./pipeline/dlt_pipeline.py
+
+      trigger:
+        triggered: {}
+
+      permissions:
+        - level: CAN_RUN
+          group_name: users
+        - level: CAN_MANAGE
+          user_name: ${var.admin_user}
