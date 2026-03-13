@@ -9,11 +9,12 @@ Layers:
   Silver  — parsed + filtered requests (streaming)
   Gold    — per-user daily metrics + per-interaction AI summaries (materialized views)
 
-Configuration:
-  Set the INFERENCE_TABLE Spark conf in the pipeline config:
-    spark.claude_analytics.inference_table = catalog.schema.endpoint_payload
+Configuration (via databricks.yml bundle variables):
+  inference_table  — fully-qualified inference table name (required)
+  summary_model    — model serving endpoint for ai_query() (default: databricks-meta-llama-3-3-70b-instruct)
 
-  Or pass via the `inference_table` bundle variable (see databricks.yml).
+  For production, set summary_model to a provisioned throughput endpoint for
+  predictable cost and latency rather than pay-per-token.
 """
 
 import dlt
@@ -23,6 +24,13 @@ from pyspark.sql.types import StringType
 
 def _get_inference_table() -> str:
     return spark.conf.get("spark.claude_analytics.inference_table")
+
+
+def _get_summary_model() -> str:
+    return spark.conf.get(
+        "spark.claude_analytics.summary_model",
+        "databricks-meta-llama-3-3-70b-instruct",
+    )
 
 
 # ── Bronze ────────────────────────────────────────────────────────────────────
@@ -156,13 +164,15 @@ def gold_interaction_summaries():
         ),
     )
 
+    summary_model = _get_summary_model()
+
     # Generate summary
     with_summary = with_prompt.withColumn(
         "interaction_summary",
         F.expr(
-            """
+            f"""
             ai_query(
-              'databricks-meta-llama-3-3-70b-instruct',
+              '{summary_model}',
               CONCAT(
                 'Summarize this Claude Code interaction in 1-2 sentences. ',
                 'What was the developer asking for and what did Claude do? ',
@@ -178,9 +188,9 @@ def gold_interaction_summaries():
     with_classification = with_summary.withColumn(
         "task_type",
         F.expr(
-            """
+            f"""
             ai_query(
-              'databricks-meta-llama-3-3-70b-instruct',
+              '{summary_model}',
               CONCAT(
                 'Classify this developer interaction into exactly one category. ',
                 'Respond with only the category name, nothing else. ',

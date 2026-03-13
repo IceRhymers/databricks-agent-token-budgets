@@ -14,6 +14,9 @@ variables:
     default: ${workspace.current_user.userName}
   inference_table:
     description: "Fully-qualified inference table name (catalog.schema.endpoint_payload)"
+  summary_model:
+    description: "Model serving endpoint name used for ai_query() summaries and classification"
+    default: "databricks-meta-llama-3-3-70b-instruct"
 
 targets:
   dev:

@@ -11,6 +11,7 @@ resources:
 
       configuration:
         spark.claude_analytics.inference_table: ${var.inference_table}
+        spark.claude_analytics.summary_model: ${var.summary_model}
 
       libraries:
         - notebook:
