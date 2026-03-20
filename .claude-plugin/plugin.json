@@ -1,0 +1,9 @@
+{
+  "name": "databricks-agent-token-budgets",
+  "description": "Enforces Databricks AI Gateway token budgets in Claude Code. Checks spending on session start and blocks prompts when a user exceeds their budget.",
+  "version": "1.0.0",
+  "author": {
+    "name": "IceRhymers"
+  },
+  "skills": "./skills/"
+}

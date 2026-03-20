@@ -89,13 +89,20 @@ There are two ways to use the budget enforcement hook with Claude Code.
 
 ### Option A: Install as a Claude Code plugin
 
-If you use the [Claude Code marketplace](https://github.com/IceRhymers/claude-marketplace-builder), install this repo as a plugin:
+Install this repo as a Claude Code plugin. The plugin automatically registers SessionStart and UserPromptSubmit hooks — no manual hook setup required:
 
 ```bash
 claude plugin add https://github.com/IceRhymers/databricks-agent-token-budgets
 ```
 
-Then run the `install-budget-hook` skill in Claude Code — it will set up the hook and configure your environment.
+Set environment variables for your deployment:
+
+```bash
+export BUDGET_API_URL=https://<your-app-url>.databricksapps.com
+export DATABRICKS_CLI_PROFILE=DEFAULT  # optional, defaults to DEFAULT
+```
+
+The plugin includes a `budget-setup` skill for troubleshooting connectivity and configuration issues.
 
 ### Option B: Manual setup
 
@@ -247,8 +254,9 @@ make test-cov
 ├── examples/claude-code/    # Reference hook implementation
 ├── resources/               # DAB resource definitions
 ├── scripts/                 # Deploy + grant scripts
-├── .claude/skills/          # Claude Code plugin skill
-├── plugin.json              # Claude Code plugin manifest
+├── .claude-plugin/          # Claude Code plugin manifest
+├── hooks/                   # Plugin hook definitions (SessionStart, UserPromptSubmit)
+├── skills/                  # Plugin skills (budget-setup troubleshooting)
 └── databricks.yml           # Databricks Asset Bundle config
 ```
 

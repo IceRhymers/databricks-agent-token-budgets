@@ -1,6 +1,0 @@
-{
-  "name": "databricks-agent-token-budgets",
-  "description": "Enforce Databricks AI Gateway token budgets in Claude Code. Blocks prompts when a user exceeds their daily, weekly, or monthly dollar limit.",
-  "version": "1.0.0",
-  "skills": "./.claude/skills/"
-}
