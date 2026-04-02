@@ -1,6 +1,6 @@
 # databricks-agent-token-budgets
 
-A Databricks App that tracks AI Gateway token usage per user and enforces daily, weekly, and monthly dollar budgets. Includes a React dashboard for admins and a Claude Code hook that blocks prompts when a user exceeds their budget.
+A Databricks App that tracks AI Gateway token usage per user, enforces daily/weekly/monthly dollar budgets, and maps Claude Code sessions to Databricks users for per-user OTEL analysis. Includes a React dashboard for admins and Claude Code hooks for budget enforcement and session registration.
 
 ## How It Works
 
@@ -15,10 +15,11 @@ A Databricks App that tracks AI Gateway token usage per user and enforces daily,
 ┌─────────────────────────────────────────────────┐
 │  Databricks App (FastAPI)                       │
 │                                                 │
-│  /api/check-budget   ← Claude Code hook calls   │
-│  /api/overview       ← React dashboard          │
-│  /api/users          ← Admin management          │
-│  /api/budgets        ← Budget CRUD               │
+│  /api/check-budget        ← Claude Code hook      │
+│  /api/sessions/register   ← Session-user mapping  │
+│  /api/overview            ← React dashboard       │
+│  /api/users               ← Admin management      │
+│  /api/budgets             ← Budget CRUD           │
 │                                                 │
 │  Background jobs:                               │
 │   • Evaluation cycle (query usage, warn)        │
@@ -28,6 +29,7 @@ A Databricks App that tracks AI Gateway token usage per user and enforces daily,
 │   • budget_configs      • usage_snapshots       │
 │   • default_budgets     • warnings              │
 │   • audit_log           • app_config            │
+│   • session_mappings                            │
 ├─────────────────────────────────────────────────┤
 │  Databricks SQL Warehouse                       │
 │   → system.ai_gateway.usage                     │
@@ -83,9 +85,9 @@ This runs: `bundle deploy` → `app start` → `grant system table access` → `
 
 Open the app URL in your browser (printed after deploy) and configure default budgets via the dashboard. Users are auto-discovered from AI Gateway usage data and assigned the default budget.
 
-## Install the Claude Code Hook
+## Install the Claude Code Hooks
 
-There are two ways to use the budget enforcement hook with Claude Code.
+There are two ways to set up the hooks with Claude Code.
 
 ### Option A: Install as a Claude Code plugin
 
@@ -95,29 +97,37 @@ Install this repo as a Claude Code plugin. The plugin automatically registers Se
 claude plugin add https://github.com/IceRhymers/databricks-agent-token-budgets
 ```
 
-Set environment variables for your deployment:
+Set `BUDGET_API_URL` in `~/.claude/settings.json`:
 
-```bash
-export BUDGET_API_URL=https://<your-app-url>.databricksapps.com
-export DATABRICKS_CLI_PROFILE=DEFAULT  # optional, defaults to DEFAULT
+```json
+{
+  "env": {
+    "BUDGET_API_URL": "https://usage-limits-<id>.aws.databricksapps.com"
+  }
+}
 ```
 
 The plugin includes a `budget-setup` skill for troubleshooting connectivity and configuration issues.
 
 ### Option B: Manual setup
 
-1. Set environment variables (in your shell profile):
+1. Set environment variables in `~/.claude/settings.json`:
 
-```bash
-export BUDGET_API_URL=https://<your-app-url>.databricksapps.com
-export DATABRICKS_CLI_PROFILE=DEFAULT  # optional, defaults to DEFAULT
+```json
+{
+  "env": {
+    "BUDGET_API_URL": "https://usage-limits-<id>.aws.databricksapps.com",
+    "DATABRICKS_CLI_PROFILE": "DEFAULT"
+  }
+}
 ```
 
-2. Copy `examples/claude-code/check-budget.sh` somewhere permanent:
+2. Copy the hook scripts somewhere permanent:
 
 ```bash
-cp examples/claude-code/check-budget.sh ~/.claude/hooks/check-budget.sh
-chmod +x ~/.claude/hooks/check-budget.sh
+cp plugin-scripts/check-budget.sh ~/.claude/hooks/check-budget.sh
+cp plugin-scripts/register-session.sh ~/.claude/hooks/register-session.sh
+chmod +x ~/.claude/hooks/*.sh
 ```
 
 3. Add hooks to `~/.claude/settings.json`:
@@ -131,7 +141,7 @@ chmod +x ~/.claude/hooks/check-budget.sh
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/check-budget.sh",
+            "command": "bash ~/.claude/hooks/register-session.sh",
             "timeout": 10000
           }
         ]
@@ -153,14 +163,14 @@ chmod +x ~/.claude/hooks/check-budget.sh
 }
 ```
 
-## How the Hook Works
+## How the Hooks Work
 
-The hook runs in two modes:
+Two hooks run at different points in the Claude Code lifecycle:
 
-- **SessionStart** (no flags): Calls the budget API, outputs current budget status as `additionalContext` so Claude sees your spending at the start of each session.
-- **UserPromptSubmit** (`--enforce`): Calls the budget API before every prompt. If `allowed: false`, exits with code 2, which blocks the prompt in Claude Code.
+- **SessionStart** (`register-session.sh`): Maps the current session ID to the authenticated Databricks user via `POST /api/sessions/register`. This enables per-user OTEL analysis. Purely informational — never blocks.
+- **UserPromptSubmit** (`check-budget.sh --enforce`): Calls `GET /api/check-budget` before every prompt. If `allowed: false`, exits with code 2, which blocks the prompt in Claude Code.
 
-The hook authenticates via `databricks auth token` (OAuth) and sends the token as `X-Forwarded-Access-Token`. It fails open on any error — if the API is unreachable or the CLI isn't installed, prompts are allowed.
+Both hooks authenticate via `databricks auth token` (OAuth) and send the token as `X-Forwarded-Access-Token`. They fail open on any error — if the API is unreachable or the CLI isn't installed, prompts are allowed.
 
 ## Configuration
 
@@ -214,7 +224,7 @@ Returns budget status for the authenticated user.
 
 ### `POST /api/sessions/register`
 
-Maps a Claude Code session ID to the authenticated Databricks user. Used by the `databricks-otel` plugin's SessionStart hook to enable per-user OTEL analysis.
+Maps a Claude Code session ID to the authenticated Databricks user for per-user OTEL analysis.
 
 **Headers:** `X-Forwarded-Access-Token: <databricks-oauth-token>`
 
@@ -233,16 +243,7 @@ Maps a Claude Code session ID to the authenticated Databricks user. Used by the 
 }
 ```
 
-The endpoint upserts on `session_id` — duplicate registrations update the user mapping rather than failing. User identity is resolved server-side from the token (never self-reported).
-
-Requires `BUDGET_API_URL` in `~/.claude/settings.json`:
-```json
-{
-  "env": {
-    "BUDGET_API_URL": "https://usage-limits-<id>.aws.databricksapps.com"
-  }
-}
-```
+Upserts on `session_id` — duplicate registrations update the mapping rather than failing. User identity is resolved server-side from the token.
 
 ## Development
 
@@ -279,15 +280,16 @@ make test-cov
 │   │   ├── pricing.py       # Model pricing + cost SQL
 │   │   ├── usage.py         # System table queries
 │   │   └── warnings.py      # Warning management
-│   ├── routers/             # API route handlers
+│   ├── routers/             # API route handlers (budgets, sessions, etc.)
 │   ├── schemas/             # Pydantic request/response schemas
 │   ├── frontend/            # React + Vite dashboard
 │   └── tests/               # Unit + integration tests
-├── examples/claude-code/    # Reference hook implementation
+├── plugin-scripts/          # Hook scripts (run on user machines)
+│   ├── check-budget.sh      # Budget enforcement (UserPromptSubmit)
+│   └── register-session.sh  # Session-user mapping (SessionStart)
+├── scripts/                 # Deployment + admin scripts
 ├── resources/               # DAB resource definitions
-├── scripts/                 # Deploy + grant scripts
-├── .claude-plugin/          # Claude Code plugin manifest
-├── hooks/                   # Plugin hook definitions (SessionStart, UserPromptSubmit)
+├── .claude-plugin/          # Claude Code plugin manifest + docs
 ├── skills/                  # Plugin skills (budget-setup troubleshooting)
 └── databricks.yml           # Databricks Asset Bundle config
 ```
