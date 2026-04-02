@@ -212,6 +212,38 @@ Returns budget status for the authenticated user.
 }
 ```
 
+### `POST /api/sessions/register`
+
+Maps a Claude Code session ID to the authenticated Databricks user. Used by the `databricks-otel` plugin's SessionStart hook to enable per-user OTEL analysis.
+
+**Headers:** `X-Forwarded-Access-Token: <databricks-oauth-token>`
+
+**Request:**
+```json
+{
+  "session_id": "abc-123-def"
+}
+```
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "user_email": "alice@example.com"
+}
+```
+
+The endpoint upserts on `session_id` — duplicate registrations update the user mapping rather than failing. User identity is resolved server-side from the token (never self-reported).
+
+Requires `BUDGET_API_URL` in `~/.claude/settings.json`:
+```json
+{
+  "env": {
+    "BUDGET_API_URL": "https://usage-limits-<id>.aws.databricksapps.com"
+  }
+}
+```
+
 ## Development
 
 ```bash

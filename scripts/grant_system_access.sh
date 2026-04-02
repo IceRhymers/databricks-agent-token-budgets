@@ -45,8 +45,7 @@ echo "    Service principal applicationId: $SP_APP_ID"
 # ── Resolve warehouse ───────────────────────────────────────────────────
 
 WAREHOUSE_ID="$(databricks bundle summary -o json -t "$TARGET" | jq -r '
-  .resources.apps | to_entries | first | .value.resources[]
-  | select(.name == "sql-warehouse") | .sql_warehouse.id
+  .resources.sql_warehouses | to_entries | first | .value.id
 ')"
 if [[ -z "$WAREHOUSE_ID" || "$WAREHOUSE_ID" == "null" ]]; then
   echo "Error: Could not resolve SQL warehouse from bundle summary."

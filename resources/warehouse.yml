@@ -1,0 +1,7 @@
+resources:
+  sql_warehouses:
+    usage_limits_warehouse:
+      name: "usage-limits-warehouse"
+      warehouse_type: PRO
+      enable_serverless_compute: true
+      cluster_size: Medium

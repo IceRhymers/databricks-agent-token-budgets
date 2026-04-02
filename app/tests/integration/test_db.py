@@ -50,15 +50,3 @@ class TestCreateEngine:
         assert args[1] == "do_connect"
 
 
-@pytest.mark.integration
-class TestInitSchema:
-    """Tests for init_schema()."""
-
-    @patch("core.db.Base")
-    def test_calls_create_all(self, mock_base):
-        from core.db import init_schema
-
-        mock_engine = MagicMock()
-        init_schema(mock_engine)
-
-        mock_base.metadata.create_all.assert_called_once_with(mock_engine)

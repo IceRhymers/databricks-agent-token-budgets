@@ -8,4 +8,7 @@ node_modules/
 .DS_Store
 *.egg-info/
 dist/
+!app/frontend/dist/
 .pytest_cache/
+.omc/
+.vscode/

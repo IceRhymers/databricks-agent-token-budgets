@@ -1,19 +1,31 @@
 {
   "name": "databricks-agent-token-budgets",
-  "description": "Enforces Databricks AI Gateway token budgets in Claude Code. Blocks prompts when a user exceeds their configured budget.",
-  "version": "1.0.0",
+  "description": "Enforces Databricks AI Gateway token budgets and maps sessions to users for per-user OTEL analysis.",
+  "version": "1.1.0",
   "author": {
     "name": "IceRhymers"
   },
   "skills": "./skills/",
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/plugin-scripts/register-session.sh",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/check-budget.sh --enforce",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/plugin-scripts/check-budget.sh --enforce",
             "timeout": 10000
           }
         ]

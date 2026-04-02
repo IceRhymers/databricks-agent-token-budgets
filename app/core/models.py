@@ -122,6 +122,17 @@ class AuditLog(Base):
     )
 
 
+class SessionMapping(Base):
+    __tablename__ = "session_mappings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(Text, nullable=False, unique=True, index=True)
+    user_email: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.now()
+    )
+
+
 class AppConfigEntry(Base):
     __tablename__ = "app_config"
 
