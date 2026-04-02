@@ -9,8 +9,9 @@
 #   start      Start the app compute (skips if already ACTIVE)
 #   stop       Stop the app compute
 #   app-deploy Deploy the app source code
+#   migrate    Grant Lakebase schema perms + run Alembic migrations
 #   grant      Grant system table access to the app's SP
-#   full       deploy → start → grant → app-deploy (default)
+#   full       deploy → start → migrate → grant → app-deploy (default)
 #   help       Print this help message
 
 set -euo pipefail
@@ -104,6 +105,13 @@ cmd_app_deploy() {
   echo "    App deploy initiated."
 }
 
+cmd_migrate() {
+  local app_name
+  app_name="$(get_app_name)"
+  echo "==> Running Lakebase migration for '$app_name'..."
+  uv run --directory "$BUNDLE_ROOT/app" python "$SCRIPT_DIR/migrate.py" --app-name "$app_name" --instance "usage-limits"
+}
+
 cmd_grant() {
   echo "==> Granting system table access (target: $TARGET)..."
   bash "$SCRIPT_DIR/grant_system_access.sh" --target "$TARGET"
@@ -112,6 +120,7 @@ cmd_grant() {
 cmd_full() {
   cmd_deploy
   cmd_start
+  cmd_migrate
   cmd_grant
   cmd_app_deploy
 }
@@ -125,8 +134,9 @@ cmd_help() {
   echo "  start       Start the app compute (skips if ACTIVE)"
   echo "  stop        Stop the app compute"
   echo "  app-deploy  Deploy the app source code"
+  echo "  migrate     Grant Lakebase schema perms + run Alembic migrations"
   echo "  grant       Grant system table access to the app's SP"
-  echo "  full        deploy → start → grant → app-deploy (default)"
+  echo "  full        deploy → start → migrate → grant → app-deploy (default)"
   echo "  help        Print this help message"
   echo ""
   echo "Options:"
@@ -143,6 +153,7 @@ case "$COMMAND" in
   start)      cmd_start ;;
   stop)       cmd_stop ;;
   app-deploy) cmd_app_deploy ;;
+  migrate)    cmd_migrate ;;
   grant)      cmd_grant ;;
   full)       cmd_full ;;
   help)       cmd_help ;;

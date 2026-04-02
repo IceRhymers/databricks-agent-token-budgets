@@ -16,7 +16,7 @@ from starlette.staticfiles import StaticFiles
 
 from api import budget_router
 from core.config import AppConfig
-from core.db import create_engine_from_config, init_schema, make_session_factory
+from core.db import create_engine_from_config, make_session_factory
 from core.evaluator import run_evaluation_cycle, run_user_sync_cycle
 from routers.overview import router as overview_router
 from routers.users import router as users_router
@@ -25,6 +25,7 @@ from routers.warnings import router as warnings_router
 from routers.audit import router as audit_router
 from routers.me import router as me_router
 from routers.my_usage import router as my_usage_router
+from routers.sessions import router as sessions_router
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,6 @@ async def lifespan(app: FastAPI):
     config = AppConfig.from_env()
     client = WorkspaceClient()
     engine = create_engine_from_config(config)
-    init_schema(engine)
     session_factory = make_session_factory(engine)
     app.state.config = config
     app.state.client = client
@@ -107,6 +107,7 @@ app.include_router(warnings_router)
 app.include_router(audit_router)
 app.include_router(me_router)
 app.include_router(my_usage_router)
+app.include_router(sessions_router)
 app.include_router(budget_router)
 
 # Serve React frontend static build if available
