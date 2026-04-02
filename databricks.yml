@@ -11,6 +11,15 @@ variables:
   admin_user:
     description: "Admin user email for CAN_MANAGE permission"
     default: ${workspace.current_user.userName}
+  otel_catalog:
+    description: "Unity Catalog catalog for OTEL metrics table"
+    default: "main"
+  otel_schema:
+    description: "Unity Catalog schema for OTEL metrics table"
+    default: "default"
+  lakebase_catalog_name:
+    description: "UC catalog name exposing the Lakebase database for SQL access"
+    default: "usage_limits"
 
 targets:
   dev:

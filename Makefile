@@ -66,6 +66,10 @@ start: ## Start the Databricks app compute
 stop: ## Stop the Databricks app compute
 	bash scripts/deploy.sh stop --target $(TARGET)
 
+.PHONY: create-otel-table
+create-otel-table: ## Create the OTEL metrics Delta table (idempotent)
+	bash scripts/deploy.sh create-otel-table --target $(TARGET)
+
 # ── Combined ─────────────────────────────────────────────────────────────
 
 .PHONY: install

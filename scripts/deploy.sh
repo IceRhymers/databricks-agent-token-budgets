@@ -11,7 +11,8 @@
 #   app-deploy Deploy the app source code
 #   migrate    Grant Lakebase schema perms + run Alembic migrations
 #   grant      Grant system table access to the app's SP
-#   full       deploy → start → migrate → grant → app-deploy (default)
+#   create-otel-table  Create the OTEL metrics Delta table (idempotent)
+#   full       deploy → start → migrate → create-otel-table → grant → app-deploy (default)
 #   help       Print this help message
 
 set -euo pipefail
@@ -45,7 +46,13 @@ check_prereqs() {
     echo "Error: 'jq' not found. Install: https://jqlang.github.io/jq/download/"
     exit 1
   fi
+  if ! command -v envsubst &>/dev/null; then
+    echo "Error: 'envsubst' not found. Install: brew install gettext (macOS) or apt-get install gettext (Linux)"
+    exit 1
+  fi
 }
+
+source "$SCRIPT_DIR/common.sh"
 
 # ── Bundle helpers ───────────────────────────────────────────────────────
 
@@ -112,6 +119,23 @@ cmd_migrate() {
   uv run --directory "$BUNDLE_ROOT/app" python "$SCRIPT_DIR/migrate.py" --app-name "$app_name" --instance "usage-limits"
 }
 
+cmd_create_otel_table() {
+  echo "==> Creating OTEL metrics table..."
+  local catalog schema warehouse_id table_sql
+  catalog="$(resolve_dab_variable otel_catalog)"
+  schema="$(resolve_dab_variable otel_schema)"
+  warehouse_id="$(resolve_warehouse_id)"
+  echo "    Catalog: $catalog  Schema: $schema  Warehouse: $warehouse_id"
+
+  WAREHOUSE_ID="$warehouse_id" run_sql "CREATE SCHEMA IF NOT EXISTS \`$catalog\`.\`$schema\`"
+
+  table_sql="$(OTEL_CATALOG="$catalog" OTEL_SCHEMA="$schema" envsubst < "$BUNDLE_ROOT/sql/create_otel_metrics.sql")"
+  # Strip SQL comments before sending
+  table_sql="$(echo "$table_sql" | sed '/^--/d')"
+  WAREHOUSE_ID="$warehouse_id" run_sql "$table_sql"
+  echo "    OTEL metrics table ready."
+}
+
 cmd_grant() {
   echo "==> Granting system table access (target: $TARGET)..."
   bash "$SCRIPT_DIR/grant_system_access.sh" --target "$TARGET"
@@ -121,6 +145,7 @@ cmd_full() {
   cmd_deploy
   cmd_start
   cmd_migrate
+  cmd_create_otel_table
   cmd_grant
   cmd_app_deploy
 }
@@ -136,7 +161,8 @@ cmd_help() {
   echo "  app-deploy  Deploy the app source code"
   echo "  migrate     Grant Lakebase schema perms + run Alembic migrations"
   echo "  grant       Grant system table access to the app's SP"
-  echo "  full        deploy → start → migrate → grant → app-deploy (default)"
+  echo "  create-otel-table  Create the OTEL metrics Delta table (idempotent)"
+  echo "  full        deploy → start → migrate → create-otel-table → grant → app-deploy (default)"
   echo "  help        Print this help message"
   echo ""
   echo "Options:"
@@ -155,6 +181,7 @@ case "$COMMAND" in
   app-deploy) cmd_app_deploy ;;
   migrate)    cmd_migrate ;;
   grant)      cmd_grant ;;
+  create-otel-table) cmd_create_otel_table ;;
   full)       cmd_full ;;
   help)       cmd_help ;;
   *)          echo "Unknown command: $COMMAND"; cmd_help; exit 1 ;;

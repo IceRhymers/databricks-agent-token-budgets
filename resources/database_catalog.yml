@@ -1,0 +1,6 @@
+resources:
+  database_catalogs:
+    sessions_catalog:
+      name: ${var.lakebase_catalog_name}
+      database_instance_name: ${resources.database_instances.usage_limits_instance.name}
+      database_name: "databricks_postgres"

@@ -21,6 +21,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+source "$SCRIPT_DIR/common.sh"
+
 # ── Resolve app service principal ────────────────────────────────────────
 
 APP_NAME="$(databricks bundle summary -o json -t "$TARGET" | jq -r '.resources.apps | to_entries | first | .value.name')"
@@ -44,27 +46,10 @@ echo "    Service principal applicationId: $SP_APP_ID"
 
 # ── Resolve warehouse ───────────────────────────────────────────────────
 
-WAREHOUSE_ID="$(databricks bundle summary -o json -t "$TARGET" | jq -r '
-  .resources.sql_warehouses | to_entries | first | .value.id
-')"
-if [[ -z "$WAREHOUSE_ID" || "$WAREHOUSE_ID" == "null" ]]; then
-  echo "Error: Could not resolve SQL warehouse from bundle summary."
-  exit 1
-fi
+WAREHOUSE_ID="$(resolve_warehouse_id)"
 echo "    Warehouse ID: $WAREHOUSE_ID"
 
 # ── Execute grants ──────────────────────────────────────────────────────
-
-run_sql() {
-  local sql="$1"
-  echo "    SQL: $sql"
-  databricks api post /api/2.0/sql/statements \
-    --json "{
-      \"warehouse_id\": \"$WAREHOUSE_ID\",
-      \"statement\": \"$sql\",
-      \"wait_timeout\": \"30s\"
-    }" | jq -r '.status.state'
-}
 
 echo "==> Granting system table access to SP $SP_APP_ID..."
 
